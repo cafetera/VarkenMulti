@@ -17,6 +17,55 @@ from abc import ABC, abstractmethod
 import json
 
 
+def normalize_data_types(points: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Normalize data types to prevent field type conflicts
+    
+    Common issues:
+    - progress_percent can be float or int -> always make int
+    - Numeric strings -> convert to proper types
+    - None values -> remove field
+    """
+    normalized = []
+    
+    for point in points:
+        normalized_point = {
+            'measurement': point.get('measurement'),
+            'tags': point.get('tags', {}).copy(),
+            'fields': {},
+            'time': point.get('time')
+        }
+        
+        # Normalize fields
+        for key, value in point.get('fields', {}).items():
+            # Skip None values
+            if value is None:
+                continue
+            
+            # Normalize specific fields known to cause type conflicts
+            if key == 'progress_percent':
+                # Always make this an integer
+                try:
+                    normalized_point['fields'][key] = int(float(value))
+                except (ValueError, TypeError):
+                    continue  # Skip if can't convert
+            elif key in ['season', 'episode', 'media_index', 'parent_media_index']:
+                # Always integers
+                try:
+                    normalized_point['fields'][key] = int(value)
+                except (ValueError, TypeError):
+                    continue
+            else:
+                # Keep as-is
+                normalized_point['fields'][key] = value
+        
+        # Only add if we have fields
+        if normalized_point['fields']:
+            normalized.append(normalized_point)
+    
+    return normalized
+
+
 @dataclass
 class DatabaseConfig:
     """Configuration for a database backend"""
@@ -274,7 +323,7 @@ class InfluxDBv3Backend(DatabaseBackend):
         try:
             # InfluxDB v3 health check
             health = self.client.health()
-            self.logger.info(f'InfluxDB v3 status: pass')
+            self.logger.info(f'InfluxDB v3 status: {health.status}')
             return True
         except Exception as e:
             self.logger.error(f"InfluxDB v3 test connection failed: {e}")
@@ -455,7 +504,7 @@ class TimescaleDBBackend(DatabaseBackend):
         self.logger.debug(f"Loaded {len(self.known_columns)} existing columns")
     
     def _ensure_column_exists(self, column_name: str, column_type: str):
-        """Add column if it doesn't exist"""
+        """Add column if it doesn't exist (with timeout protection)"""
         # Sanitize column name (lowercase, replace spaces with underscores)
         safe_column = column_name.lower().replace(' ', '_').replace('-', '_')
         
@@ -474,12 +523,18 @@ class TimescaleDBBackend(DatabaseBackend):
             else:
                 pg_type = 'TEXT'
             
+            # Set statement timeout to prevent hanging (5 seconds)
+            self.cursor.execute("SET statement_timeout = '5s';")
+            
             # Add column
             self.cursor.execute(f"""
                 ALTER TABLE varken_metrics 
                 ADD COLUMN IF NOT EXISTS {safe_column} {pg_type};
             """)
             self.connection.commit()
+            
+            # Reset timeout
+            self.cursor.execute("SET statement_timeout = 0;")
             
             # Add to cache
             self.known_columns.add(safe_column)
@@ -488,6 +543,11 @@ class TimescaleDBBackend(DatabaseBackend):
         except Exception as e:
             self.logger.warning(f"Could not add column {safe_column}: {e}")
             self.connection.rollback()
+            # Reset timeout
+            try:
+                self.cursor.execute("SET statement_timeout = 0;")
+            except:
+                pass
         
         return safe_column
     
@@ -672,6 +732,7 @@ class QuestDBBackend(DatabaseBackend):
             
             # Send to QuestDB via HTTP
             data = '\n'.join(lines)
+            
             response = self.session.post(
                 f"{self.base_url}/write?db=varken",
                 data=data,
@@ -706,7 +767,7 @@ class QuestDBBackend(DatabaseBackend):
     
     def _escape_field_string_value(self, s: str) -> str:
         """Escape string field value (used inside quotes)"""
-        return s.replace('"', '\\"').replace('\\', '\\\\')
+        return s.replace('\\', '\\\\').replace('"', '\\"')  # Backslash FIRST!
     
     def _convert_timestamp(self, ts) -> str:
         """Convert timestamp to nanoseconds for QuestDB"""
@@ -869,7 +930,7 @@ class VictoriaMetricsBackend(DatabaseBackend):
     
     def _escape_field_string_value(self, s: str) -> str:
         """Escape string field value (used inside quotes)"""
-        return s.replace('"', '\\"').replace('\\', '\\\\')
+        return s.replace('\\', '\\\\').replace('"', '\\"')  # Backslash FIRST!
     
     def _convert_timestamp(self, ts) -> str:
         """Convert timestamp to nanoseconds for VictoriaMetrics"""
@@ -948,17 +1009,54 @@ class MultiDBManager:
     
     def write_points(self, points: List[Dict[str, Any]]) -> Dict[str, bool]:
         """
-        Write points to all configured backends
+        Write points to all configured backends with timeout protection
         Returns dict with status for each backend
         """
+        import threading
+        
+        # Normalize data types before writing to prevent type conflicts
+        normalized_points = normalize_data_types(points)
+        
+        if not normalized_points:
+            self.logger.warning("No valid points after normalization")
+            return {}
+        
         results = {}
+        
+        def write_with_timeout(backend, points, timeout=30):
+            """Write to backend with timeout"""
+            result = {'success': False, 'error': None}
+            
+            def do_write():
+                try:
+                    result['success'] = backend.write_points(points)
+                except Exception as e:
+                    result['error'] = str(e)
+            
+            thread = threading.Thread(target=do_write)
+            thread.daemon = True
+            thread.start()
+            thread.join(timeout=timeout)
+            
+            if thread.is_alive():
+                result['error'] = f"Write timeout after {timeout}s"
+                result['success'] = False
+            
+            return result['success'], result['error']
+        
         for backend in self.backends:
             db_name = f"{backend.config.db_type}@{backend.config.url}:{backend.config.port}"
             try:
-                success = backend.write_points(points)
+                # Use timeout for write
+                success, error = write_with_timeout(backend, normalized_points, timeout=30)
                 results[db_name] = success
+                
                 if not success:
-                    self.logger.warning(f"Failed to write to {db_name}")
+                    if error:
+                        self.logger.warning(f"Failed to write to {db_name}: {error}")
+                    else:
+                        self.logger.warning(f"Failed to write to {db_name}")
+                        
             except Exception as e:
                 self.logger.error(f"Error writing to {db_name}: {e}")
                 results[db_name] = False

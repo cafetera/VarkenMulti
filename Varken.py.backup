@@ -19,23 +19,8 @@ from varken import VERSION, BRANCH, BUILD_DATE
 from varken.sonarr import SonarrAPI
 from varken.radarr import RadarrAPI
 from varken.lidarr import LidarrAPI
-
-#from varken.iniparser import INIParser
-#from varken.dbmanager import DBManager
-# Enhanced multi-database support
-try:
-    from varken.dbmanager_v2 import DBManager
-    from varken.iniparser_v2 import EnhancedINIParser as INIParser
-    MULTI_DB_ENABLED = True
-    print("✓ Multi-database support enabled")
-except ImportError as e:
-    # Fallback to original if new files not found
-    from varken.dbmanager import DBManager
-    from varken.iniparser import INIParser
-    MULTI_DB_ENABLED = False
-    print("✗ Using original single-database mode")
-
-
+from varken.iniparser import INIParser
+from varken.dbmanager import DBManager
 from varken.helpers import GeoIPHandler
 from varken.tautulli import TautulliAPI
 from varken.sickchill import SickChillAPI
@@ -104,23 +89,8 @@ if __name__ == "__main__":
 
     vl.logger.info("Varken v%s-%s %s", VERSION, BRANCH, BUILD_DATE)
 
-    CONFIG = INIParser('/opt/Varken/data/varken.ini')
-
-    print("DEBUG CONFIG ATTRS:", sorted(CONFIG.__dict__.keys()))
-    print("DEBUG tautulli_servers:", getattr(CONFIG, 'tautulli_servers', 'MISSING'))
-    print("Tautulli servers:", getattr(CONFIG, 'tautulli_servers', None))
-    print("DEBUG enabled_dbs:", CONFIG.get_enabled_databases())
-    print("DEBUG CONFIG attrs:", CONFIG.__dict__.keys())
-
-    if hasattr(CONFIG, 'database_configs'):
-        CONFIG.database_configs = CONFIG.get_enabled_databases()
-    if MULTI_DB_ENABLED and hasattr(CONFIG, 'database_configs'):
-        DBMANAGER = DBManager(CONFIG.get_enabled_databases())
-        print(f"✓ Connected to {DBMANAGER.multi_manager.get_backend_count()} database(s)")
-    else:
-        DBMANAGER = DBManager(CONFIG.influx_server)
-        print("✓ Connected to InfluxDB v1")
-
+    CONFIG = INIParser(DATA_FOLDER)
+    DBMANAGER = DBManager(CONFIG.influx_server)
     QUEUE = Queue()
 
     if CONFIG.sonarr_enabled:

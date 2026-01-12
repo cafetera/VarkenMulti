@@ -1,101 +1,61 @@
-# Varken Multi-Database Enhancement
+<p align="center">
+<img width="800" src="https://raw.githubusercontent.com/Boerderij/Varken/master/assets/varken_full_banner.jpg" alt="Logo Banner">
+</p>
 
-## What is this?
+[![pipeline status](https://img.shields.io/github/workflow/status/Boerderij/Varken/varken?style=flat-square)](https://github.com/Boerderij/Varken/actions?query=workflow%3Avarken)
+[![Discord](https://img.shields.io/discord/518970285773422592.svg?colorB=7289DA&label=Discord&logo=Discord&logoColor=7289DA&style=flat-square)](https://discord.gg/VjZ6qSM)
+[![ko-fi](https://img.shields.io/badge/Buy%20Us%20A%20Coffee-Donate-ff813f.svg?logo=CoffeeScript&style=flat-square)](https://ko-fi.com/varken)
+[![Docker-Layers](https://images.microbadger.com/badges/image/boerderij/varken.svg)](https://microbadger.com/images/boerderij/varken)
+[![Release](https://img.shields.io/github/release/boerderij/varken.svg?style=flat-square)](https://github.com/Boerderij/Varken/releases/latest)
+[![Docker Pulls](https://img.shields.io/docker/pulls/boerderij/varken.svg)](https://hub.docker.com/r/boerderij/varken/)
 
-**Enhanced Varken** that writes your Plex metrics to **6 different databases simultaneously** instead of just InfluxDB.
+Dutch for PIG. PIG is an Acronym for Plex/InfluxDB/Grafana
 
-## Supported Databases
+Varken is a standalone application to aggregate data from the Plex 
+ecosystem into InfluxDB using Grafana for a frontend
 
-- ✅ InfluxDB (v1, v2, v3)
-- ✅ TimescaleDB (PostgreSQL)
-- ✅ QuestDB
-- ✅ VictoriaMetrics
+Requirements:
+* [Python 3.6.7+](https://www.python.org/downloads/release/python-367/)
+* [Python3-pip](https://pip.pypa.io/en/stable/installing/)
+* [InfluxDB 1.8.x](https://www.influxdata.com/)
+* [Grafana](https://grafana.com/)
 
-## Why?
+<p align="center">
+Example Dashboard
 
-### Multiple databases at once
-Write to all enabled databases simultaneously - perfect for:
-- **Migration**: Test new database while keeping old one running
-- **Backup**: Store data in multiple places (local + cloud)
-- **Cost savings**: Use free VictoriaMetrics for long-term storage
-- **Testing**: Try new databases risk-free
+<img width="800" src="https://i.imgur.com/3hNZTkC.png" alt="dashboard">
+</p>
 
-### Better performance
-- Auto-creates TimescaleDB columns with proper types
-- Correct line protocol formatting for all databases
-- Per-database error handling (one fails, others continue)
+Supported Modules:
+* [Sonarr](https://sonarr.tv/) - Smart PVR for newsgroup and bittorrent users.
+* [SickChill](https://sickchill.github.io/) - SickChill is an automatic Video Library Manager for TV Shows.
+* [Radarr](https://radarr.video/) - A fork of Sonarr to work with movies à la Couchpotato.
+* [Tautulli](https://tautulli.com/) - A Python based monitoring and tracking tool for Plex Media Server.
+* [Ombi](https://ombi.io/) - Want a Movie or TV Show on Plex or Emby? Use Ombi!
+* [Lidarr](https://lidarr.audio/) - Looks and smells like Sonarr but made for music.
 
-### 100% backward compatible
-Works with your existing Varken config - just add new database sections.
+Key features:
+* Multiple server support for all modules
+* Geolocation mapping from [GeoLite2](https://dev.maxmind.com/geoip/geoip2/geolite2/)
+* Grafana [Worldmap Panel](https://grafana.com/plugins/grafana-worldmap-panel/installation) support
 
-## Quick Example
 
-**Before:**
-```
-Tautulli → Varken → InfluxDB → Grafana
-```
+## Installation Guides
+Varken Installation guides can be found in the [wiki](https://wiki.cajun.pro/books/varken/chapter/installation).
 
-**After:**
-```
-                    ┌→ InfluxDB (production)
-Tautulli → Varken ─┼→ TimescaleDB (SQL queries)
-                    └→ VictoriaMetrics (free, unlimited retention)
-```
+## Support
+Please read [Asking for Support](https://wiki.cajun.pro/books/varken/chapter/asking-for-support) before seeking support. 
 
-## Installation
+[Click here for quick access to discord support](http://cyborg.decreator.dev/channels/518970285773422592/530424560504537105/). No app or account needed!
+    
+### InfluxDB
+[InfluxDB Installation Documentation](https://wiki.cajun.pro/books/varken/page/influxdb-d1f)
+Note: Only v1.8.x is currently supported.
+ 
+Influxdb is required but not packaged as part of Varken. Varken will create
+its database on its own. If you choose to give varken user permissions that
+do not include database creation, please ensure you create an influx database
+named `varken`
 
-```bash
-# 1. Copy enhanced files
-sudo cp dbmanager_v2.py /opt/Varken/varken/
-sudo cp iniparser_v2.py /opt/Varken/varken/
-
-# 2. Enable databases in config
-[INFLUXDB]
-enabled = true
-
-[TIMESCALEDB]
-enabled = true
-
-# 3. Restart
-sudo systemctl restart varken
-```
-
-Done! Data now flows to all enabled databases.
-
-## What's Included
-
-**Code:**
-- `dbmanager_v2.py` - 6 database backends
-- `iniparser_v2.py` - Enhanced config parser
-- `varken.service` - Systemd service
-
-**Documentation:**
-- Installation guide
-- Database-specific guides
-- Migration guides
-- Troubleshooting
-- 30+ enhancement ideas
-
-## Real Benefits
-
-- **Save money**: Free VictoriaMetrics vs paid InfluxDB Cloud
-- **Zero downtime**: Migrate databases while keeping old one running
-- **Flexibility**: Use different databases for different purposes
-- **Reliability**: Redundant storage across multiple databases
-
-## Quick Stats
-
-| Feature | Original | Enhanced |
-|---------|----------|----------|
-| Databases | 1 | 6 |
-| Multi-write | ❌ | ✅ |
-| Auto-schema | ❌ | ✅ (TimescaleDB) |
-| Line protocol | Basic | Production-grade |
-
-## Get Started
-
-See **INSTALLATION_GUIDE.md** - 15 minutes to setup.
-
----
-
-**TL;DR**: Varken + write to 6 databases at once + better formatting + comprehensive docs = production-ready multi-database metrics platform! 🚀
+### Grafana
+[Grafana Installation/Dashboard Documentation](https://wiki.cajun.pro/books/varken/page/grafana) 

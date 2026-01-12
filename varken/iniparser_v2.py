@@ -1,3 +1,8 @@
+"""
+Enhanced INI Parser for Varken with Multi-Database Support
+Supports configuration for multiple database backends
+"""
+
 from configparser import ConfigParser
 from typing import List, Optional
 from dataclasses import dataclass
@@ -6,6 +11,7 @@ from varken.dbmanager_v2 import DatabaseConfig
 
 @dataclass
 class InfluxServer:
+    """Legacy InfluxDB server configuration"""
     url: str
     port: int
     username: str
@@ -16,10 +22,11 @@ class InfluxServer:
 
 @dataclass
 class TautulliServer:
+    """Tautulli server configuration"""
     id: int
     url: str
     fallback_ip: str
-    api_key: str  
+    api_key: str  # Changed from apikey to api_key
     ssl: bool
     verify_ssl: bool
     get_activity: bool
@@ -31,9 +38,10 @@ class TautulliServer:
 
 @dataclass
 class SonarrServer:
+    """Sonarr server configuration"""
     id: int
     url: str
-    api_key: str  
+    api_key: str  # Changed from apikey to api_key
     ssl: bool
     verify_ssl: bool
     missing_days: int
@@ -46,9 +54,10 @@ class SonarrServer:
 
 @dataclass
 class RadarrServer:
+    """Radarr server configuration"""
     id: int
     url: str
-    api_key: str  
+    api_key: str  # Changed from apikey to api_key
     ssl: bool
     verify_ssl: bool
     queue: bool
@@ -59,9 +68,10 @@ class RadarrServer:
 
 @dataclass
 class LidarrServer:
+    """Lidarr server configuration"""
     id: int
     url: str
-    api_key: str  
+    api_key: str  # Changed from apikey to api_key
     ssl: bool
     verify_ssl: bool
     missing_days: int
@@ -77,7 +87,7 @@ class OmbiServer:
     """Ombi server configuration"""
     id: int
     url: str
-    api_key: str  
+    api_key: str  # Changed from apikey to api_key
     ssl: bool
     verify_ssl: bool
     get_request_type_counts: bool
@@ -90,9 +100,10 @@ class OmbiServer:
 
 @dataclass
 class SickChillServer:
+    """SickChill server configuration"""
     id: int
     url: str
-    api_key: str  
+    api_key: str  # Changed from apikey to api_key
     ssl: bool
     verify_ssl: bool
     get_missing: bool
@@ -101,6 +112,7 @@ class SickChillServer:
 
 @dataclass
 class UniFiServer:
+    """UniFi server configuration"""
     id: int
     url: str
     username: str
@@ -113,6 +125,9 @@ class UniFiServer:
 
 
 class EnhancedINIParser:
+    """
+    Enhanced configuration parser supporting multiple database backends
+    """
     
     def __init__(self, config_path: str):
         self.config = ConfigParser()
@@ -129,6 +144,7 @@ class EnhancedINIParser:
         self._parse_services()
     
     def _parse_databases(self):
+        """Parse all database backend configurations"""
         
         # Parse InfluxDB v1 (check both uppercase and lowercase for backward compatibility)
         if self.config.has_section('INFLUXDB') or self.config.has_section('influxdb'):
